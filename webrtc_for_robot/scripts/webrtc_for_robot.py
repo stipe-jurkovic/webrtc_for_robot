@@ -93,13 +93,20 @@ async def consumeOffer(peerconnection, offersdp, db, doc_watch):
     offer = RTCSessionDescription(sdp=offersdp, type="offer")
     # player = MediaPlayer('/dev/video0', format='v4l2', options={'video_size': '640x480' , 'fps':'10'})
     global videosender, video, webcam
-    # options = {"framerate": "3", "video_size": "640x480"}
-
-    # dodat da se ponovno pokrene kamera ako je ugasena sa if statementom
+    try:
+        options = {"framerate": "30", "video_size": "640x480"}
+        if webcam and webcam.video.readyState != "live":
+            webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
+        if not webcam:
+            webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
+        relay = MediaRelay()
+        video = relay.subscribe(webcam.video)
+    except:
+        print("Webcam unavailable!")
 
     # webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
-    relay = MediaRelay()
-    video = relay.subscribe(webcam.video)
+    #relay = MediaRelay()
+    #video = relay.subscribe(webcam.video)
     videosender = peerconnection.addTrack(video)
     print(await videosender.getStats())
     await peerconnection.setRemoteDescription(offer)
@@ -206,6 +213,14 @@ async def main(db, db_ns):
         previousConnectionState = peerconnection.connectionState
         print("peerconnection.connectionState:  ", peerconnection.connectionState, i)
         print("peerconnection.iceConnectionState: ", peerconnection.iceConnectionState, i)
+        if webcam:
+            print("Webcam state :", webcam.video.readyState)
+        if webcam and webcam.video.readyState != "live":
+            print("test")
+            if datachannel and datachannel.readyState == "open":
+                    datachannel.send("Reconnect46855")
+                    await peerconnection.close()
+                    break
         if i % 2 == 0 and peerconnection.connectionState == "connected":
             stats = await videosender.getStats()
             # print(await videosender.getStats())
@@ -228,7 +243,7 @@ async def main(db, db_ns):
                 print("same packet count:", samePacketCount)
 
             if samePacketCount == 3:
-                if datachannel.readyState == "open":
+                if datachannel and datachannel.readyState == "open":
                     datachannel.send("Reconnect46855")
                 await peerconnection.close()
                 break
@@ -252,8 +267,8 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
 
     # options = {"framerate": "3", "video_size": "1280x720"}
-    options = {"framerate": "15", "video_size": "640x480"}
-    webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
+    #options = {"framerate": "15", "video_size": "640x480"}
+    #webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
 
     rospy.init_node('webrtc_for_robot', anonymous=True)
     pub = rospy.Publisher('/turtle1/cmd_vel', Twist, queue_size=10)
