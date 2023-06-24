@@ -94,11 +94,9 @@ async def consumeOffer(peerconnection, offersdp, db, doc_watch):
     # player = MediaPlayer('/dev/video0', format='v4l2', options={'video_size': '640x480' , 'fps':'10'})
     global videosender, video, webcam
     try:
-        options = {"framerate": "30", "video_size": "640x480"}
-        if webcam and webcam.video.readyState != "live":
-            webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
-        if not webcam:
-            webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
+        if not webcam or webcam.video.readyState != "live":
+            options = {"framerate": "3", "video_size": "640x480"}
+            webcam = MediaPlayer("/dev/video0", format="v4l2")
         relay = MediaRelay()
         video = relay.subscribe(webcam.video)
     except:
@@ -215,12 +213,11 @@ async def main(db, db_ns):
         print("peerconnection.iceConnectionState: ", peerconnection.iceConnectionState, i)
         if webcam:
             print("Webcam state :", webcam.video.readyState)
-        if webcam and webcam.video.readyState != "live":
+        if webcam and webcam.video.readyState != "live"and datachannel and datachannel.readyState == "open":
             print("test")
-            if datachannel and datachannel.readyState == "open":
-                    datachannel.send("Reconnect46855")
-                    await peerconnection.close()
-                    break
+            datachannel.send("Reconnect46855")
+            await peerconnection.close()
+            break
         if i % 2 == 0 and peerconnection.connectionState == "connected":
             stats = await videosender.getStats()
             # print(await videosender.getStats())
@@ -246,6 +243,7 @@ async def main(db, db_ns):
                 if datachannel and datachannel.readyState == "open":
                     datachannel.send("Reconnect46855")
                 await peerconnection.close()
+                #webcam.video.stop()
                 break
         else:
             print("")
@@ -256,6 +254,7 @@ async def main(db, db_ns):
             and i == 7
             or f == 1
         ):
+            #webcam.video.stop()
             await peerconnection.close()
             break
         await sleep(2)
@@ -284,6 +283,7 @@ if __name__ == "__main__":
             try:
                 main_task = asyncio.ensure_future(main(db, db_ns))
                 loop.run_until_complete(main_task)
+                webcam.video.stop()
             except KeyboardInterrupt:
                 print("Received exit, exiting/n")
             finally:
