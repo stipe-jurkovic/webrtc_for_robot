@@ -87,25 +87,29 @@ def dbinit():
     db = firestore_async.client()
     db_ns = firestore.client()
     return db, db_ns
-
-
-async def consumeOffer(peerconnection, offersdp, db, doc_watch):
-    offer = RTCSessionDescription(sdp=offersdp, type="offer")
-    # player = MediaPlayer('/dev/video0', format='v4l2', options={'video_size': '640x480' , 'fps':'10'})
+def openWebcam():
     global videosender, video, webcam
     try:
         if not webcam or webcam.video.readyState != "live":
-            options = {"framerate": "3", "video_size": "640x480"}
-            webcam = MediaPlayer("/dev/video0", format="v4l2")
+            options = {"framerate": "5", "video_size": "640x480"}
+            webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
         relay = MediaRelay()
         video = relay.subscribe(webcam.video)
     except:
         print("Webcam unavailable!")
 
-    # webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
-    #relay = MediaRelay()
-    #video = relay.subscribe(webcam.video)
+async def consumeOffer(peerconnection, offersdp, db, doc_watch):
+    offer = RTCSessionDescription(sdp=offersdp, type="offer")
+    # player = MediaPlayer('/dev/video0', format='v4l2', options={'video_size': '640x480' , 'fps':'10'})
+    global videosender, video, webcam
+    while not webcam or webcam.video.readyState != "live":
+        openWebcam()
+        await sleep(1)
     videosender = peerconnection.addTrack(video)
+
+    # webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
+    # relay = MediaRelay()
+    # video = relay.subscribe(webcam.video)
     print(await videosender.getStats())
     await peerconnection.setRemoteDescription(offer)
 
@@ -170,34 +174,41 @@ async def main(db, db_ns):
         def on_message(message):
             print(message)
             if isinstance(message, str) and message.startswith("control"):
-                if message == 'control-up':
+                if message == "control-up":
                     rospy.loginfo("control-up print")
                     move_cmd.linear.x = 2.0
                     move_cmd.angular.z = 0
                     pub.publish(move_cmd)
-                if message == 'control-down':
+                if message == "control-down":
                     rospy.loginfo("control-down print")
                     move_cmd.linear.x = -2.0
                     move_cmd.angular.z = 0
                     pub.publish(move_cmd)
-                if message == 'control-left':
+                if message == "control-left":
                     rospy.loginfo("control-left print")
                     move_cmd.angular.z = 2.0
                     move_cmd.linear.x = 0
                     pub.publish(move_cmd)
-                if message == 'control-right':
+                if message == "control-right":
                     rospy.loginfo("control-right print")
                     move_cmd.angular.z = -2.0
                     move_cmd.linear.x = 0
                     pub.publish(move_cmd)
-                    
+            if isinstance(message, str) and message.startswith("joyZ"):
+                rospy.loginfo(message)
+                #print(message[4:9])
+                #print(message[13:])
+                move_cmd.linear.x = -2*float(message[4:9])
+                move_cmd.angular.z = -2*float(message[13:])
+                #move_cmd.angular.z = 0
+                pub.publish(move_cmd)
             if message == "endcall123455":
                 nonlocal f
                 f = 1
 
     i = 0
     previousConnectionState = "new"
-    samePacketCount = 0 
+    samePacketCount = 0
     prevpacketsSent = 0
     prevpacketsReceived = 0
     packetsSent = 0
@@ -210,10 +221,17 @@ async def main(db, db_ns):
             i = 0
         previousConnectionState = peerconnection.connectionState
         print("peerconnection.connectionState:  ", peerconnection.connectionState, i)
-        print("peerconnection.iceConnectionState: ", peerconnection.iceConnectionState, i)
+        print(
+            "peerconnection.iceConnectionState: ", peerconnection.iceConnectionState, i
+        )
         if webcam:
             print("Webcam state :", webcam.video.readyState)
-        if webcam and webcam.video.readyState != "live"and datachannel and datachannel.readyState == "open":
+        if (
+            webcam
+            and webcam.video.readyState != "live"
+            and datachannel
+            and datachannel.readyState == "open"
+        ):
             print("test")
             datachannel.send("Reconnect46855")
             await peerconnection.close()
@@ -243,7 +261,7 @@ async def main(db, db_ns):
                 if datachannel and datachannel.readyState == "open":
                     datachannel.send("Reconnect46855")
                 await peerconnection.close()
-                #webcam.video.stop()
+                # webcam.video.stop()
                 break
         else:
             print("")
@@ -254,7 +272,7 @@ async def main(db, db_ns):
             and i == 7
             or f == 1
         ):
-            #webcam.video.stop()
+            # webcam.video.stop()
             await peerconnection.close()
             break
         await sleep(2)
@@ -266,19 +284,19 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
 
     # options = {"framerate": "3", "video_size": "1280x720"}
-    #options = {"framerate": "15", "video_size": "640x480"}
-    #webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
+    # options = {"framerate": "15", "video_size": "640x480"}
+    # webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
 
-    rospy.init_node('webrtc_for_robot', anonymous=True)
-    pub = rospy.Publisher('/turtle1/cmd_vel', Twist, queue_size=10)
-    rate = rospy.Rate(10) # 10hz
+    rospy.init_node("webrtc_for_robot", anonymous=True)
+    pub = rospy.Publisher("/turtle1/cmd_vel", Twist, queue_size=10)
+    rate = rospy.Rate(10)  # 10hz
     move_cmd = Twist()
 
     try:
         while not rospy.is_shutdown():
             # Run the main function in the event loop
             print("\n\n New loop \n\n")
-            #loop.run_until_complete(main(db, db_ns))
+            # loop.run_until_complete(main(db, db_ns))
             rate.sleep()
             try:
                 main_task = asyncio.ensure_future(main(db, db_ns))
@@ -298,7 +316,7 @@ if __name__ == "__main__":
         print("Received exit, exiting/n")
         loop.stop()
         loop.close()
-    #except rospy.ROSInterruptException:
+    # except rospy.ROSInterruptException:
     #    print(rospy.ROSInterruptException)
     #    pass
 
