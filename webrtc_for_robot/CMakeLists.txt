@@ -166,8 +166,7 @@ include_directories(
 # )
 catkin_install_python(
   PROGRAMS 
-  scripts/webrtc_for_robot.py 
-  scripts/listener.py
+  scripts/webrtc_for_robot.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 ## Mark executables for installation

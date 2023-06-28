@@ -4,6 +4,7 @@
 ## to the 'chatter' topic
 
 import rospy
+import time
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 import warnings
@@ -176,32 +177,62 @@ async def main(db, db_ns):
             if isinstance(message, str) and message.startswith("control"):
                 if message == "control-up":
                     rospy.loginfo("control-up print")
-                    move_cmd.linear.x = 2.0
+                    move_cmd.linear.x = 1.0
+                    move_cmd.linear.y = 0
+                    move_cmd.linear.z = 0
+                    move_cmd.angular.x = 0
+                    move_cmd.angular.y = 0
                     move_cmd.angular.z = 0
                     pub.publish(move_cmd)
                 if message == "control-down":
                     rospy.loginfo("control-down print")
-                    move_cmd.linear.x = -2.0
+                    move_cmd.linear.x = -1.0
+                    move_cmd.linear.y = 0
+                    move_cmd.linear.z = 0
+                    move_cmd.angular.x = 0
+                    move_cmd.angular.y = 0
                     move_cmd.angular.z = 0
                     pub.publish(move_cmd)
                 if message == "control-left":
                     rospy.loginfo("control-left print")
-                    move_cmd.angular.z = 2.0
                     move_cmd.linear.x = 0
+                    move_cmd.linear.y = 0
+                    move_cmd.linear.z = 1.0
+                    move_cmd.angular.x = 0
+                    move_cmd.angular.y = 0
+                    move_cmd.angular.z = 0
                     pub.publish(move_cmd)
                 if message == "control-right":
                     rospy.loginfo("control-right print")
-                    move_cmd.angular.z = -2.0
                     move_cmd.linear.x = 0
+                    move_cmd.linear.y = 0
+                    move_cmd.linear.z = -1.0
+                    move_cmd.angular.x = 0
+                    move_cmd.angular.y = 0
+                    move_cmd.angular.z = 0
                     pub.publish(move_cmd)
+                if message == "control-stop":
+                    move_cmd.linear.x = 0
+                    move_cmd.linear.y = 0
+                    move_cmd.linear.z = 0
+                    move_cmd.angular.x = 0
+                    move_cmd.angular.y = 0
+                    move_cmd.angular.z = 0
+                    pub.publish(move_cmd)
+
             if isinstance(message, str) and message.startswith("joyZ"):
                 rospy.loginfo(message)
-                #print(message[4:9])
-                #print(message[13:])
-                move_cmd.linear.x = -2*float(message[4:9])
-                move_cmd.angular.z = -2*float(message[13:])
-                #move_cmd.angular.z = 0
+                print(message[4:9])
+                print(message[13:])
+                move_cmd.linear.x = -0.5*float(message[4:9])
+                move_cmd.linear.y = 0
+                move_cmd.linear.z = 0
+                move_cmd.angular.x = 0
+                move_cmd.angular.y = 0
+                move_cmd.angular.z = -0.5*float(message[13:])
                 pub.publish(move_cmd)
+
+                
             if message == "endcall123455":
                 nonlocal f
                 f = 1
@@ -288,7 +319,7 @@ if __name__ == "__main__":
     # webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
 
     rospy.init_node("webrtc_for_robot", anonymous=True)
-    pub = rospy.Publisher("/turtle1/cmd_vel", Twist, queue_size=10)
+    pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
     rate = rospy.Rate(10)  # 10hz
     move_cmd = Twist()
 
@@ -319,19 +350,3 @@ if __name__ == "__main__":
     # except rospy.ROSInterruptException:
     #    print(rospy.ROSInterruptException)
     #    pass
-
-# def talker():
-#   pub = rospy.Publisher('chatter', String, queue_size=10)
-#  rospy.init_node('talker', anonymous=True)
-# rate = rospy.Rate(10) # 10hz
-# while not rospy.is_shutdown():
-#    hello_str = "test %s" % rospy.get_time()
-#    rospy.loginfo(hello_str + "\n\n")
-#    pub.publish(hello_str + "\n\n")
-#    rate.sleep()
-
-# if __name__ == '__main__':
-#   try:
-#     talker()
-#  except rospy.ROSInterruptException:
-#    pass
