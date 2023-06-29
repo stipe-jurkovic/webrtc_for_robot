@@ -2,6 +2,8 @@
 
 ## Simple talker demo that published std_msgs/Strings messages
 ## to the 'chatter' topic
+import faulthandler
+
 
 import rospy
 import time
@@ -34,6 +36,8 @@ import firebase_admin
 from firebase_admin import firestore_async, firestore, credentials
 import threading
 
+robotName = None
+chosenPassword = None
 relay = None
 webcam = None
 videosender = None
@@ -41,6 +45,7 @@ video = None
 pub = None
 rate = None
 move_cmd = None
+
 ice_servers = [
     RTCIceServer(urls=["stun:stun.l.google.com:19302"]),
     RTCIceServer(urls=["stun:a.relay.metered.ca:80"]),
@@ -88,6 +93,8 @@ def dbinit():
     db = firestore_async.client()
     db_ns = firestore.client()
     return db, db_ns
+
+
 def openWebcam():
     global videosender, video, webcam
     try:
@@ -99,18 +106,17 @@ def openWebcam():
     except:
         print("Webcam unavailable!")
 
-async def consumeOffer(peerconnection, offersdp, db, doc_watch):
+
+async def consumeOffer(peerconnection, offersdp, passwordattempt, db, doc_watch):
+    if passwordattempt != chosenPassword:
+        return
     offer = RTCSessionDescription(sdp=offersdp, type="offer")
-    # player = MediaPlayer('/dev/video0', format='v4l2', options={'video_size': '640x480' , 'fps':'10'})
     global videosender, video, webcam
     while not webcam or webcam.video.readyState != "live":
         openWebcam()
         await sleep(1)
     videosender = peerconnection.addTrack(video)
 
-    # webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
-    # relay = MediaRelay()
-    # video = relay.subscribe(webcam.video)
     print(await videosender.getStats())
     await peerconnection.setRemoteDescription(offer)
 
@@ -119,12 +125,10 @@ async def consumeOffer(peerconnection, offersdp, db, doc_watch):
         if peerconnection.connectionState == "closed":
             print("closed")
 
-    #      webcam._stop(webcam.video)
-
     answer = await peerconnection.createAnswer()
     await peerconnection.setLocalDescription(answer)
 
-    await db.collection("test").document("answer").set(
+    await db.collection(robotName).document("answer").set(
         {
             "type": peerconnection.localDescription.type,
             "sdp": peerconnection.localDescription.sdp,
@@ -136,6 +140,14 @@ async def consumeOffer(peerconnection, offersdp, db, doc_watch):
 
 
 async def main(db, db_ns):
+    i = 0
+    previousConnectionState = "new"
+    samePacketCount = 0
+    prevpacketsSent = 0
+    prevpacketsReceived = 0
+    packetsSent = 0
+    packetsReceived = 0
+
     peerconnection = RTCPeerConnection(configuration)
     task = None
 
@@ -147,19 +159,19 @@ async def main(db, db_ns):
             for doc in doc_snapshot:
                 print(f"Received offer: {doc.id}")
                 if doc.exists:
-                    offersdp = (
-                        db_ns.collection("test").document("offer").get().get("sdp")
-                    )
+                    offersdp = doc_ref.get().get("sdp")
+                    password = doc_ref.get().get("password")
                     nonlocal task
                     task = asyncio.ensure_future(
-                        consumeOffer(peerconnection, offersdp, db, doc_watch), loop=loop
+                        consumeOffer(peerconnection, offersdp, password, db, doc_watch),
+                        loop=loop,
                     )
                     print("Task:", task)
                     print("Got", doc.get("type"), "!")
-                    db_ns.collection("test").document("offer").delete()
+                    doc_ref.delete()
             callback_done.set()
 
-    doc_ref = db_ns.collection("test").document("offer")
+    doc_ref = db_ns.collection(robotName).document("offer")
     doc_watch = doc_ref.on_snapshot(on_snapshot)
 
     f = 0
@@ -174,87 +186,39 @@ async def main(db, db_ns):
         @channel.on("message")
         def on_message(message):
             print(message)
+            rospy.loginfo(message)
             if isinstance(message, str) and message.startswith("control"):
                 if message == "control-up":
-                    rospy.loginfo("control-up print")
-                    move_cmd.linear.x = 1.0
-                    move_cmd.linear.y = 0
-                    move_cmd.linear.z = 0
-                    move_cmd.angular.x = 0
-                    move_cmd.angular.y = 0
+                    move_cmd.linear.x = 0.22
                     move_cmd.angular.z = 0
-                    pub.publish(move_cmd)
-                if message == "control-down":
-                    rospy.loginfo("control-down print")
-                    move_cmd.linear.x = -1.0
-                    move_cmd.linear.y = 0
-                    move_cmd.linear.z = 0
-                    move_cmd.angular.x = 0
-                    move_cmd.angular.y = 0
+                elif message == "control-down":
+                    move_cmd.linear.x = -0.22
                     move_cmd.angular.z = 0
-                    pub.publish(move_cmd)
-                if message == "control-left":
-                    rospy.loginfo("control-left print")
+                elif message == "control-left":
                     move_cmd.linear.x = 0
-                    move_cmd.linear.y = 0
-                    move_cmd.linear.z = 1.0
-                    move_cmd.angular.x = 0
-                    move_cmd.angular.y = 0
-                    move_cmd.angular.z = 0
-                    pub.publish(move_cmd)
-                if message == "control-right":
-                    rospy.loginfo("control-right print")
+                    move_cmd.angular.z = 1.0
+                elif message == "control-right":
                     move_cmd.linear.x = 0
-                    move_cmd.linear.y = 0
-                    move_cmd.linear.z = -1.0
-                    move_cmd.angular.x = 0
-                    move_cmd.angular.y = 0
-                    move_cmd.angular.z = 0
-                    pub.publish(move_cmd)
-                if message == "control-stop":
+                    move_cmd.angular.z = -1.0
+                elif message == "control-stop":
                     move_cmd.linear.x = 0
-                    move_cmd.linear.y = 0
-                    move_cmd.linear.z = 0
-                    move_cmd.angular.x = 0
-                    move_cmd.angular.y = 0
                     move_cmd.angular.z = 0
-                    pub.publish(move_cmd)
+            elif isinstance(message, str) and message.startswith("joyZ"):
+                move_cmd.linear.x = -0.22 * float(message[4:9])
+                move_cmd.angular.z = -float(message[13:])
 
-            if isinstance(message, str) and message.startswith("joyZ"):
-                rospy.loginfo(message)
-                print(message[4:9])
-                print(message[13:])
-                move_cmd.linear.x = -0.5*float(message[4:9])
-                move_cmd.linear.y = 0
-                move_cmd.linear.z = 0
-                move_cmd.angular.x = 0
-                move_cmd.angular.y = 0
-                move_cmd.angular.z = -0.5*float(message[13:])
-                pub.publish(move_cmd)
-
-                
             if message == "endcall123455":
                 nonlocal f
                 f = 1
 
-    i = 0
-    previousConnectionState = "new"
-    samePacketCount = 0
-    prevpacketsSent = 0
-    prevpacketsReceived = 0
-    packetsSent = 0
-    packetsReceived = 0
-
     while not rospy.is_shutdown():
         i = i + 1
-        global videosender, video, relay, webcam
+        global videosender, webcam
         if peerconnection.connectionState != previousConnectionState:
             i = 0
         previousConnectionState = peerconnection.connectionState
-        print("peerconnection.connectionState:  ", peerconnection.connectionState, i)
-        print(
-            "peerconnection.iceConnectionState: ", peerconnection.iceConnectionState, i
-        )
+        print("pc.connectionState:  ", peerconnection.connectionState, i)
+        print("pc.iceConnectionState: ", peerconnection.iceConnectionState, i)
         if webcam:
             print("Webcam state :", webcam.video.readyState)
         if (
@@ -263,25 +227,21 @@ async def main(db, db_ns):
             and datachannel
             and datachannel.readyState == "open"
         ):
-            print("test")
             datachannel.send("Reconnect46855")
             await peerconnection.close()
             break
         if i % 2 == 0 and peerconnection.connectionState == "connected":
             stats = await videosender.getStats()
-            # print(await videosender.getStats())
             task.cancel()
 
             prevpacketsSent = packetsSent
             outbound_key = next(key for key in stats if "outbound" in key)
             packetsSent = stats[outbound_key].packetsSent
-
             print("packetsSent: ", packetsSent)
 
             prevpacketsReceived = packetsReceived
             transport_key = next(key for key in stats if "transport" in key)
             packetsReceived = stats[transport_key].packetsReceived
-
             print("packetsRecieved: ", packetsReceived, "\n")
 
             if packetsSent == prevpacketsSent or packetsReceived == prevpacketsReceived:
@@ -294,8 +254,6 @@ async def main(db, db_ns):
                 await peerconnection.close()
                 # webcam.video.stop()
                 break
-        else:
-            print("")
         if (
             peerconnection
             and peerconnection.connectionState == "failed"
@@ -303,32 +261,37 @@ async def main(db, db_ns):
             and i == 7
             or f == 1
         ):
-            # webcam.video.stop()
             await peerconnection.close()
             break
-        await sleep(2)
+        j = 0
+        while j < 20:
+            pub.publish(move_cmd)
+            await sleep(0.1)
+            j = j + 1
+        print(" ")
     return
 
 
 if __name__ == "__main__":
+    faulthandler.enable()
     db, db_ns = dbinit()
     loop = asyncio.get_event_loop()
 
-    # options = {"framerate": "3", "video_size": "1280x720"}
-    # options = {"framerate": "15", "video_size": "640x480"}
-    # webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
-
     rospy.init_node("webrtc_for_robot", anonymous=True)
-    pub = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
+    pub = rospy.Publisher("cmd_vel", Twist, queue_size=10)
     rate = rospy.Rate(10)  # 10hz
     move_cmd = Twist()
-
+    print(robotName and chosenPassword and len(robotName) > 0 and len(chosenPassword) > 0)
+    while True:
+        robotName = input("Choose robot name:")
+        chosenPassword = input("Choose a password:")
+        if not (len(robotName) > 0 and len(chosenPassword) > 0):
+            print("Password and robot name need to be at least one character long!\n")
+        else :
+            break
     try:
         while not rospy.is_shutdown():
-            # Run the main function in the event loop
             print("\n\n New loop \n\n")
-            # loop.run_until_complete(main(db, db_ns))
-            rate.sleep()
             try:
                 main_task = asyncio.ensure_future(main(db, db_ns))
                 loop.run_until_complete(main_task)
@@ -347,6 +310,3 @@ if __name__ == "__main__":
         print("Received exit, exiting/n")
         loop.stop()
         loop.close()
-    # except rospy.ROSInterruptException:
-    #    print(rospy.ROSInterruptException)
-    #    pass
