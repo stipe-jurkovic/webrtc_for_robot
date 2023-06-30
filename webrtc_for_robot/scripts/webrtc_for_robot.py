@@ -1,9 +1,4 @@
-#!/home/stipe-vmv3/venv_za_ros/bin/python3
-
-## Simple talker demo that published std_msgs/Strings messages
-## to the 'chatter' topic
-import faulthandler
-
+#!/usr/bin/env python
 
 import rospy
 import time
@@ -14,7 +9,6 @@ import logging
 
 # logging.basicConfig(level=logging.DEBUG)
 import av.logging
-
 ## monkey patch av.logging.restore_default_callback
 restore_default_callback = lambda *args: args
 av.logging.restore_default_callback = restore_default_callback
@@ -141,12 +135,14 @@ async def consumeOffer(peerconnection, offersdp, passwordattempt, db, doc_watch)
 
 async def main(db, db_ns):
     i = 0
+    f = 0
     previousConnectionState = "new"
     samePacketCount = 0
     prevpacketsSent = 0
     prevpacketsReceived = 0
     packetsSent = 0
     packetsReceived = 0
+    datachannel = None
 
     peerconnection = RTCPeerConnection(configuration)
     task = None
@@ -174,8 +170,6 @@ async def main(db, db_ns):
     doc_ref = db_ns.collection(robotName).document("offer")
     doc_watch = doc_ref.on_snapshot(on_snapshot)
 
-    f = 0
-    datachannel = None
 
     @peerconnection.on("datachannel")
     def on_datachannel(channel):
@@ -223,16 +217,16 @@ async def main(db, db_ns):
             print("Webcam state :", webcam.video.readyState)
         if (
             webcam
-            and webcam.video.readyState != "live"
             and datachannel
+            and webcam.video.readyState != "live"
             and datachannel.readyState == "open"
         ):
             datachannel.send("Reconnect46855")
             await peerconnection.close()
             break
         if i % 2 == 0 and peerconnection.connectionState == "connected":
-            stats = await videosender.getStats()
             task.cancel()
+            stats = await videosender.getStats()
 
             prevpacketsSent = packetsSent
             outbound_key = next(key for key in stats if "outbound" in key)
@@ -273,7 +267,6 @@ async def main(db, db_ns):
 
 
 if __name__ == "__main__":
-    faulthandler.enable()
     db, db_ns = dbinit()
     loop = asyncio.get_event_loop()
 
@@ -281,7 +274,7 @@ if __name__ == "__main__":
     pub = rospy.Publisher("cmd_vel", Twist, queue_size=10)
     rate = rospy.Rate(10)  # 10hz
     move_cmd = Twist()
-    print(robotName and chosenPassword and len(robotName) > 0 and len(chosenPassword) > 0)
+    
     while True:
         robotName = input("Choose robot name:")
         chosenPassword = input("Choose a password:")
