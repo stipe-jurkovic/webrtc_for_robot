@@ -9,6 +9,7 @@ import logging
 
 # logging.basicConfig(level=logging.DEBUG)
 import av.logging
+
 ## monkey patch av.logging.restore_default_callback
 restore_default_callback = lambda *args: args
 av.logging.restore_default_callback = restore_default_callback
@@ -170,7 +171,6 @@ async def main(db, db_ns):
     doc_ref = db_ns.collection(robotName).document("offer")
     doc_watch = doc_ref.on_snapshot(on_snapshot)
 
-
     @peerconnection.on("datachannel")
     def on_datachannel(channel):
         print("added datachannel")
@@ -183,23 +183,35 @@ async def main(db, db_ns):
             rospy.loginfo(message)
             if isinstance(message, str) and message.startswith("control"):
                 if message == "control-up":
-                    move_cmd.linear.x = 0.22
-                    move_cmd.angular.z = 0
+                    if move_cmd.linear.x < 0.22:
+                        move_cmd.linear.x = move_cmd.linear.x + 0.01
+                    else:
+                        move_cmd.linear.x = 0.22
+                    print(move_cmd.linear.x)
                 elif message == "control-down":
-                    move_cmd.linear.x = -0.22
-                    move_cmd.angular.z = 0
+                    if move_cmd.linear.x > -0.22:
+                        move_cmd.linear.x = move_cmd.linear.x - 0.01
+                    else:
+                        move_cmd.linear.x = -0.22
+                    print(move_cmd.linear.x)
                 elif message == "control-left":
-                    move_cmd.linear.x = 0
-                    move_cmd.angular.z = 1.0
+                    if move_cmd.angular.z < 2.79:
+                        move_cmd.angular.z = move_cmd.angular.z + 0.05
+                    else:
+                        move_cmd.angular.z = 2.84
+                    print(move_cmd.angular.z)
                 elif message == "control-right":
-                    move_cmd.linear.x = 0
-                    move_cmd.angular.z = -1.0
+                    if move_cmd.angular.z > -2.79:
+                        move_cmd.angular.z = move_cmd.angular.z - 0.05
+                    else:
+                        move_cmd.angular.z = -2.84
+                    print(move_cmd.angular.z)
                 elif message == "control-stop":
                     move_cmd.linear.x = 0
                     move_cmd.angular.z = 0
             elif isinstance(message, str) and message.startswith("joyZ"):
                 move_cmd.linear.x = -0.22 * float(message[4:9])
-                move_cmd.angular.z = -float(message[13:])
+                move_cmd.angular.z = -2.00 * float(message[13:])
 
             if message == "endcall123455":
                 nonlocal f
@@ -246,7 +258,6 @@ async def main(db, db_ns):
                 if datachannel and datachannel.readyState == "open":
                     datachannel.send("Reconnect46855")
                 await peerconnection.close()
-                # webcam.video.stop()
                 break
         if (
             peerconnection
@@ -274,13 +285,13 @@ if __name__ == "__main__":
     pub = rospy.Publisher("cmd_vel", Twist, queue_size=10)
     rate = rospy.Rate(10)  # 10hz
     move_cmd = Twist()
-    
+
     while True:
         robotName = input("Choose robot name:")
         chosenPassword = input("Choose a password:")
         if not (len(robotName) > 0 and len(chosenPassword) > 0):
             print("Password and robot name need to be at least one character long!\n")
-        else :
+        else:
             break
     try:
         while not rospy.is_shutdown():
@@ -293,7 +304,7 @@ if __name__ == "__main__":
                 print("Received exit, exiting/n")
             finally:
                 print("One loop done!")
-                print(rospy.is_shutdown())
+                print("rospy.is_shutdown():", rospy.is_shutdown())
                 if rospy.is_shutdown():
                     print("Received exit, exiting/n")
                     loop.stop()
