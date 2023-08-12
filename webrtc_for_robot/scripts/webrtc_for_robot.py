@@ -174,48 +174,60 @@ async def main(db, db_ns):
     @peerconnection.on("datachannel")
     def on_datachannel(channel):
         print("added datachannel")
+        print(channel.label)
         nonlocal datachannel
-        datachannel = channel
+        if channel.label == "RTT":
+            datachannelRTT = channel
 
-        @channel.on("message")
-        def on_message(message):
-            print(message)
-            rospy.loginfo(message)
-            if isinstance(message, str) and message.startswith("control"):
-                if message == "control-up":
-                    if move_cmd.linear.x < 0.22:
-                        move_cmd.linear.x = move_cmd.linear.x + 0.01
-                    else:
-                        move_cmd.linear.x = 0.22
-                    print(move_cmd.linear.x)
-                elif message == "control-down":
-                    if move_cmd.linear.x > -0.22:
-                        move_cmd.linear.x = move_cmd.linear.x - 0.01
-                    else:
-                        move_cmd.linear.x = -0.22
-                    print(move_cmd.linear.x)
-                elif message == "control-left":
-                    if move_cmd.angular.z < 2.79:
-                        move_cmd.angular.z = move_cmd.angular.z + 0.05
-                    else:
-                        move_cmd.angular.z = 2.84
-                    print(move_cmd.angular.z)
-                elif message == "control-right":
-                    if move_cmd.angular.z > -2.79:
-                        move_cmd.angular.z = move_cmd.angular.z - 0.05
-                    else:
-                        move_cmd.angular.z = -2.84
-                    print(move_cmd.angular.z)
-                elif message == "control-stop":
-                    move_cmd.linear.x = 0
-                    move_cmd.angular.z = 0
-            elif isinstance(message, str) and message.startswith("joyZ"):
-                move_cmd.linear.x = -0.22 * float(message[4:9])
-                move_cmd.angular.z = -2.00 * float(message[13:])
+            @datachannelRTT.on("message")
+            def on_message(message):
+                datachannelRTT.send(message)
+                #print("message", int(message))
+                #print("time   ",int(time.time() * 1000))
+                #print(int(time.time() * 1000) - int(message))
 
-            if message == "endcall123455":
-                nonlocal f
-                f = 1
+        elif channel.label == "Robot control":
+            datachannel = channel
+
+            @datachannel.on("message")
+            def on_message(message):
+                print(message)
+                rospy.loginfo(message)
+                if isinstance(message, str) and message.startswith("control"):
+                    if message == "control-up":
+                        if move_cmd.linear.x < 0.22:
+                            move_cmd.linear.x = move_cmd.linear.x + 0.01
+                        else:
+                            move_cmd.linear.x = 0.22
+                        print(move_cmd.linear.x)
+                    elif message == "control-down":
+                        if move_cmd.linear.x > -0.22:
+                            move_cmd.linear.x = move_cmd.linear.x - 0.01
+                        else:
+                            move_cmd.linear.x = -0.22
+                        print(move_cmd.linear.x)
+                    elif message == "control-left":
+                        if move_cmd.angular.z < 2.79:
+                            move_cmd.angular.z = move_cmd.angular.z + 0.05
+                        else:
+                            move_cmd.angular.z = 2.84
+                        print(move_cmd.angular.z)
+                    elif message == "control-right":
+                        if move_cmd.angular.z > -2.79:
+                            move_cmd.angular.z = move_cmd.angular.z - 0.05
+                        else:
+                            move_cmd.angular.z = -2.84
+                        print(move_cmd.angular.z)
+                    elif message == "control-stop":
+                        move_cmd.linear.x = 0
+                        move_cmd.angular.z = 0
+                elif isinstance(message, str) and message.startswith("joyZ"):
+                    move_cmd.linear.x = -0.22 * float(message[4:9])
+                    move_cmd.angular.z = -2.00 * float(message[13:])
+
+                if message == "endcall123455":
+                    nonlocal f
+                    f = 1
 
     while not rospy.is_shutdown():
         i = i + 1
