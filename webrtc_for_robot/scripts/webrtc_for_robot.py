@@ -94,7 +94,7 @@ def openWebcam():
     global videosender, video, webcam
     try:
         if not webcam or webcam.video.readyState != "live":
-            options = {"framerate": "5", "video_size": "640x480"}
+            options = {"framerate": "5", "video_size": "640x480"} #treba staviti nižu rezoluciju da bi kašnjenje bilo manje
             webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
         relay = MediaRelay()
         video = relay.subscribe(webcam.video)
