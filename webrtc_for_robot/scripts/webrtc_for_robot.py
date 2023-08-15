@@ -1,20 +1,38 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+
+import logging
+
+my_own_handler = logging.StreamHandler()
+my_own_handler.setLevel(logging.DEBUG)
+my_own_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")  # Users can use logging format preferable for them
+my_own_handler.setFormatter(my_own_formatter)
+
+aiortc_logger = logging.getLogger("aiortc")
+aiortc_logger.addHandler(my_own_handler)
+aiortc_logger.setLevel(logging.DEBUG)
+import importlib
+from importlib import reload 
+def fix_logging(level=logging.DEBUG):
+    console = logging.StreamHandler()
+    console.setLevel(level)
+    logging.getLogger('').addHandler(console)
+    formatter = logging.Formatter('%(levelname)-8s:%(name)-12s: %(message)s')
+    console.setFormatter(formatter)
+    logging.getLogger('').addHandler(console)
+    
 
 import rospy
 import time
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist
 import warnings
-import logging
-
-# logging.basicConfig(level=logging.DEBUG)
 import av.logging
 
-## monkey patch av.logging.restore_default_callback
+
+# monkey patch av.logging.restore_default_callback
 restore_default_callback = lambda *args: args
 av.logging.restore_default_callback = restore_default_callback
-av.logging.set_level(av.logging.ERROR)
-warnings.filterwarnings("ignore", category=RuntimeWarning, module="google_crc32c")
+av.logging.set_level(av.logging.DEBUG)
 import asyncio
 from asyncio import sleep
 import aiortc
@@ -30,6 +48,7 @@ from aiortc.contrib.media import MediaPlayer, MediaRelay
 import firebase_admin
 from firebase_admin import firestore_async, firestore, credentials
 import threading
+
 
 robotName = None
 chosenPassword = None
@@ -94,9 +113,9 @@ def openWebcam():
     global videosender, video, webcam
     try:
         if not webcam or webcam.video.readyState != "live":
-            options = {"framerate": "5", "video_size": "640x480"} #treba staviti nižu rezoluciju da bi kašnjenje bilo manje
-            webcam = MediaPlayer("/dev/video0", format="v4l2", options=options)
+            webcam = MediaPlayer("/dev/video0", options={'video_size': '160x120'})
         relay = MediaRelay()
+        print(relay.__format__)
         video = relay.subscribe(webcam.video)
     except:
         print("Webcam unavailable!")
@@ -282,7 +301,7 @@ async def main(db, db_ns):
             break
         j = 0
         while j < 20:
-            pub.publish(move_cmd)
+            #pub.publish(move_cmd)
             await sleep(0.1)
             j = j + 1
         print(" ")
@@ -294,6 +313,13 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
 
     rospy.init_node("webrtc_for_robot", anonymous=True)
+    reload(logging)                               # za reload logginga jer ga preuzme ros
+    reload(aiortc)
+    #logging.basicConfig(level=logging.DEBUG)
+
+    #logger = logging.getLogger("aiortc")
+    #logger.setLevel(logging.DEBUG)
+    
     pub = rospy.Publisher("cmd_vel", Twist, queue_size=10)
     rate = rospy.Rate(10)  # 10hz
     move_cmd = Twist()
