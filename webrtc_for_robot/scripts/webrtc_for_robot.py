@@ -285,7 +285,7 @@ async def main(db, db_ns):
                 samePacketCount = samePacketCount + 1
                 print("same packet count:", samePacketCount)
 
-            if samePacketCount == 3:
+            if samePacketCount >= 3:
                 if datachannel and datachannel.readyState == "open":
                     datachannel.send("Reconnect46855")
                 await peerconnection.close()
@@ -301,7 +301,7 @@ async def main(db, db_ns):
             break
         j = 0
         while j < 20:
-            #pub.publish(move_cmd)
+            pub.publish(move_cmd)
             await sleep(0.1)
             j = j + 1
         print(" ")
