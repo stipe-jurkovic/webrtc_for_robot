@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import logging
-#tstghhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhddddddddddddddftff
+#tstghhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhddddddddddddddftfffff
 '''my_own_handler = logging.StreamHandler()
 my_own_handler.setLevel(logging.DEBUG)
 my_own_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
