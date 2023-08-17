@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import logging
+import logging #test
 
 '''my_own_handler = logging.StreamHandler()
 my_own_handler.setLevel(logging.DEBUG)
