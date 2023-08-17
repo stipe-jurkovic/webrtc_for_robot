@@ -19,8 +19,8 @@ import av.logging
 
 
 # monkey patch av.logging.restore_default_callback
-'''restore_default_callback = lambda *args: args
-av.logging.restore_default_callback = restore_default_callback'''
+restore_default_callback = lambda *args: args
+av.logging.restore_default_callback = restore_default_callback
 av.logging.set_level(av.logging.DEBUG)
 import asyncio
 from asyncio import sleep
@@ -298,8 +298,7 @@ if __name__ == "__main__":
     db, db_ns = dbinit()
     loop = asyncio.get_event_loop()
 
-    rospy.init_node("webrtc_for_robot", anonymous=True)
-    
+    rospy.init_node("webrtc_for_robot", anonymous=False)
     
     pub = rospy.Publisher("cmd_vel", Twist, queue_size=10)
     rate = rospy.Rate(10)  # 10hz
