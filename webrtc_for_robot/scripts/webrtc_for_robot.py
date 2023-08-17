@@ -2,24 +2,13 @@
 
 import logging
 
-my_own_handler = logging.StreamHandler()
+'''my_own_handler = logging.StreamHandler()
 my_own_handler.setLevel(logging.DEBUG)
-my_own_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")  # Users can use logging format preferable for them
+my_own_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 my_own_handler.setFormatter(my_own_formatter)
-
 aiortc_logger = logging.getLogger("aiortc")
 aiortc_logger.addHandler(my_own_handler)
-aiortc_logger.setLevel(logging.DEBUG)
-import importlib
-from importlib import reload 
-def fix_logging(level=logging.DEBUG):
-    console = logging.StreamHandler()
-    console.setLevel(level)
-    logging.getLogger('').addHandler(console)
-    formatter = logging.Formatter('%(levelname)-8s:%(name)-12s: %(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
-    
+aiortc_logger.setLevel(logging.DEBUG)'''
 
 import rospy
 import time
@@ -30,8 +19,8 @@ import av.logging
 
 
 # monkey patch av.logging.restore_default_callback
-restore_default_callback = lambda *args: args
-av.logging.restore_default_callback = restore_default_callback
+'''restore_default_callback = lambda *args: args
+av.logging.restore_default_callback = restore_default_callback'''
 av.logging.set_level(av.logging.DEBUG)
 import asyncio
 from asyncio import sleep
@@ -113,7 +102,7 @@ def openWebcam():
     global videosender, video, webcam
     try:
         if not webcam or webcam.video.readyState != "live":
-            webcam = MediaPlayer("/dev/video0", options={'video_size': '160x120'}) #treba staviti nižu rezoluciju da bi kašnjenje bilo manje
+            webcam = MediaPlayer("/dev/video0", options={'video_size': '320x240'})
         relay = MediaRelay()
         print(relay.__format__)
         video = relay.subscribe(webcam.video)
@@ -201,9 +190,6 @@ async def main(db, db_ns):
             @datachannelRTT.on("message")
             def on_message(message):
                 datachannelRTT.send(message)
-                #print("message", int(message))
-                #print("time   ",int(time.time() * 1000))
-                #print(int(time.time() * 1000) - int(message))
 
         elif channel.label == "Robot control":
             datachannel = channel
@@ -313,12 +299,7 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
 
     rospy.init_node("webrtc_for_robot", anonymous=True)
-    reload(logging)                               # za reload logginga jer ga preuzme ros
-    reload(aiortc)
-    #logging.basicConfig(level=logging.DEBUG)
-
-    #logger = logging.getLogger("aiortc")
-    #logger.setLevel(logging.DEBUG)
+    
     
     pub = rospy.Publisher("cmd_vel", Twist, queue_size=10)
     rate = rospy.Rate(10)  # 10hz
@@ -337,7 +318,9 @@ if __name__ == "__main__":
             try:
                 main_task = asyncio.ensure_future(main(db, db_ns))
                 loop.run_until_complete(main_task)
-                webcam.video.stop()
+                if webcam:
+                    webcam.video.stop()
+                    webcam = None
             except KeyboardInterrupt:
                 print("Received exit, exiting/n")
             finally:
