@@ -286,6 +286,7 @@ async def main(db, db_ns):
             and i == 7
             or f == 1
         ):
+            webcam.video.stop()
             await peerconnection.close()
             break
         j = 0
@@ -322,9 +323,8 @@ if __name__ == "__main__":
             try:
                 '''main_task = asyncio.ensure_future(main(db, db_ns))
                 loop.run_until_complete(main_task)'''
-                asyncio.run(main(db, db_ns))
+                loop.run_until_complete(main(db, db_ns))
                 if webcam:
-                    webcam.video.stop()
                     webcam = None
             except KeyboardInterrupt:
                 print("Received exit, exiting/n")
