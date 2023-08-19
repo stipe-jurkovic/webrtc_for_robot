@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!./ROSvenv/bin/env python3
 
 import logging
 
@@ -41,6 +41,8 @@ import threading
 
 robotName = None
 chosenPassword = None
+dbpassword = None
+offersdp = None
 relay = None
 webcam = None
 videosender = None
@@ -96,6 +98,8 @@ def dbinit():
     db = firestore_async.client()
     db_ns = firestore.client()
     return db, db_ns
+   
+
 
 
 def openWebcam():
@@ -111,13 +115,14 @@ def openWebcam():
 
 
 async def consumeOffer(peerconnection, offersdp, passwordattempt, db, doc_watch):
+    print(passwordattempt, chosenPassword)
     if passwordattempt != chosenPassword:
         return
     offer = RTCSessionDescription(sdp=offersdp, type="offer")
     global videosender, video, webcam
     while not webcam or webcam.video.readyState != "live":
-        openWebcam()
         await sleep(1)
+        openWebcam()
     videosender = peerconnection.addTrack(video)
 
     print(await videosender.getStats())
@@ -145,6 +150,7 @@ async def consumeOffer(peerconnection, offersdp, passwordattempt, db, doc_watch)
 async def main(db, db_ns):
     i = 0
     f = 0
+    k = 0
     previousConnectionState = "new"
     samePacketCount = 0
     prevpacketsSent = 0
@@ -154,27 +160,21 @@ async def main(db, db_ns):
     datachannel = None
 
     peerconnection = RTCPeerConnection(configuration)
-    task = None
 
     callback_done = threading.Event()
-    loop = asyncio.get_event_loop()
 
     def on_snapshot(doc_snapshot, changes, read_time):
-        if peerconnection.connectionState != "connected":
-            for doc in doc_snapshot:
-                print(f"Received offer: {doc.id}")
-                if doc.exists:
-                    offersdp = doc_ref.get().get("sdp")
-                    password = doc_ref.get().get("password")
-                    nonlocal task
-                    task = asyncio.ensure_future(
-                        consumeOffer(peerconnection, offersdp, password, db, doc_watch),
-                        loop=loop,
-                    )
-                    print("Task:", task)
-                    print("Got", doc.get("type"), "!")
-                    doc_ref.delete()
-            callback_done.set()
+            #if peerconnection.connectionState != "connected":
+        for doc in doc_snapshot:
+            print(f"Received offer: {doc.id}")
+            if doc.exists:
+                global offersdp, dbpassword
+                offersdp = doc_ref.get().get("sdp")
+                print(offersdp)
+                dbpassword = doc_ref.get().get("password")
+                print("Got", doc.get("type"), "!")
+                doc_ref.delete()
+                callback_done.set()
 
     doc_ref = db_ns.collection(robotName).document("offer")
     doc_watch = doc_ref.on_snapshot(on_snapshot)
@@ -236,6 +236,10 @@ async def main(db, db_ns):
 
     while not rospy.is_shutdown():
         i = i + 1
+        print(callback_done.is_set())
+        if callback_done.is_set()==True and k==0:
+            await consumeOffer(peerconnection, offersdp, dbpassword, db, doc_watch)
+            k = 1
         global videosender, webcam
         if peerconnection.connectionState != previousConnectionState:
             i = 0
@@ -254,7 +258,6 @@ async def main(db, db_ns):
             await peerconnection.close()
             break
         if i % 2 == 0 and peerconnection.connectionState == "connected":
-            task.cancel()
             stats = await videosender.getStats()
 
             prevpacketsSent = packetsSent
@@ -288,7 +291,9 @@ async def main(db, db_ns):
         j = 0
         while j < 20:
             pub.publish(move_cmd)
-            await sleep(0.1)
+            #print("test1")
+            await asyncio.sleep(0.1)
+            #print("test2")
             j = j + 1
         print(" ")
     return
@@ -315,21 +320,22 @@ if __name__ == "__main__":
         while not rospy.is_shutdown():
             print("\n\n New loop \n\n")
             try:
-                main_task = asyncio.ensure_future(main(db, db_ns))
-                loop.run_until_complete(main_task)
+                '''main_task = asyncio.ensure_future(main(db, db_ns))
+                loop.run_until_complete(main_task)'''
+                asyncio.run(main(db, db_ns))
                 if webcam:
                     webcam.video.stop()
                     webcam = None
             except KeyboardInterrupt:
                 print("Received exit, exiting/n")
-            finally:
+            '''finally:
                 print("One loop done!")
                 print("rospy.is_shutdown():", rospy.is_shutdown())
                 if rospy.is_shutdown():
                     print("Received exit, exiting/n")
                     loop.stop()
                     loop.close()
-
+'''
     except KeyboardInterrupt:
         print("Received exit, exiting/n")
         loop.stop()
