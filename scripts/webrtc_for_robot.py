@@ -2,13 +2,13 @@
 
 import logging
 
-'''my_own_handler = logging.StreamHandler()
+"""my_own_handler = logging.StreamHandler()
 my_own_handler.setLevel(logging.DEBUG)
 my_own_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 my_own_handler.setFormatter(my_own_formatter)
 aiortc_logger = logging.getLogger("aiortc")
 aiortc_logger.addHandler(my_own_handler)
-aiortc_logger.setLevel(logging.DEBUG)'''
+aiortc_logger.setLevel(logging.DEBUG)"""
 
 import rospy
 import time
@@ -98,15 +98,13 @@ def dbinit():
     db = firestore_async.client()
     db_ns = firestore.client()
     return db, db_ns
-   
-
 
 
 def openWebcam():
-    global videosender, video, webcam
+    global videosender, video, webcam, relay
     try:
         if not webcam or webcam.video.readyState != "live":
-            webcam = MediaPlayer("/dev/video0", options={'video_size': '320x240'})
+            webcam = MediaPlayer("/dev/video0", options={"video_size": "320x240"})
         relay = MediaRelay()
         print(relay.__format__)
         video = relay.subscribe(webcam.video)
@@ -121,7 +119,7 @@ async def consumeOffer(peerconnection, offersdp, passwordattempt, db, doc_watch)
     offer = RTCSessionDescription(sdp=offersdp, type="offer")
     global videosender, video, webcam
     while not webcam or webcam.video.readyState != "live":
-        await sleep(1)
+        time.sleep(1)
         openWebcam()
     videosender = peerconnection.addTrack(video)
 
@@ -164,7 +162,7 @@ async def main(db, db_ns):
     callback_done = threading.Event()
 
     def on_snapshot(doc_snapshot, changes, read_time):
-            #if peerconnection.connectionState != "connected":
+        # if peerconnection.connectionState != "connected":
         for doc in doc_snapshot:
             print(f"Received offer: {doc.id}")
             if doc.exists:
@@ -237,7 +235,7 @@ async def main(db, db_ns):
     while not rospy.is_shutdown():
         i = i + 1
         print(callback_done.is_set())
-        if callback_done.is_set()==True and k==0:
+        if callback_done.is_set() == True and k == 0:
             await consumeOffer(peerconnection, offersdp, dbpassword, db, doc_watch)
             k = 1
         global videosender, webcam
@@ -292,9 +290,9 @@ async def main(db, db_ns):
         j = 0
         while j < 20:
             pub.publish(move_cmd)
-            #print("test1")
+            # print("test1")
             await asyncio.sleep(0.1)
-            #print("test2")
+            # print("test2")
             j = j + 1
         print(" ")
     return
@@ -305,7 +303,7 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
 
     rospy.init_node("webrtc_for_robot", anonymous=False)
-    
+
     pub = rospy.Publisher("cmd_vel", Twist, queue_size=10)
     rate = rospy.Rate(10)  # 10hz
     move_cmd = Twist()
@@ -321,21 +319,20 @@ if __name__ == "__main__":
         while not rospy.is_shutdown():
             print("\n\n New loop \n\n")
             try:
-                '''main_task = asyncio.ensure_future(main(db, db_ns))
-                loop.run_until_complete(main_task)'''
                 loop.run_until_complete(main(db, db_ns))
                 if webcam:
+                    webcam.video.stop()
                     webcam = None
             except KeyboardInterrupt:
                 print("Received exit, exiting/n")
-            '''finally:
+            """finally:
                 print("One loop done!")
                 print("rospy.is_shutdown():", rospy.is_shutdown())
                 if rospy.is_shutdown():
                     print("Received exit, exiting/n")
                     loop.stop()
                     loop.close()
-'''
+"""
     except KeyboardInterrupt:
         print("Received exit, exiting/n")
         loop.stop()
