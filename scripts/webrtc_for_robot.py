@@ -48,6 +48,8 @@ videosender = None
 pub = None
 rate = None
 move_cmd = None
+videoSize = "160x120"
+videoCodec = "video/VP8"
 
 
 ice_servers = [
@@ -103,11 +105,18 @@ def openWebcam():
     global videosender, webcam
     try:
         if not webcam or webcam.video.readyState != "live":
-            webcam = MediaPlayer("/dev/video0", options={"video_size": "320x240"})
+            webcam = MediaPlayer("/dev/video0", options={"video_size": videoSize})   #1280x720 160x120 176x144 320x240 352x288 640x480
         print(webcam.__format__)
     except:
         print("Webcam unavailable!")
 
+def force_codec(pc, sender, forced_codec):
+    kind = forced_codec.split("/")[0]
+    codecs = aiortc.RTCRtpSender.getCapabilities(kind).codecs
+    transceiver = next(t for t in pc.getTransceivers() if t.sender == sender)
+    transceiver.setCodecPreferences(
+        [codec for codec in codecs if codec.mimeType == forced_codec]
+    ) 
 
 async def consumeOffer(peerconnection, offersdp, passwordattempt, db, doc_watch):
     print(passwordattempt, chosenPassword)
@@ -119,6 +128,7 @@ async def consumeOffer(peerconnection, offersdp, passwordattempt, db, doc_watch)
         time.sleep(1)
         openWebcam()
     videosender = peerconnection.addTrack(webcam.video)
+    force_codec(peerconnection, videosender, videoCodec)
 
     print(await videosender.getStats())
     await peerconnection.setRemoteDescription(offer)
@@ -164,8 +174,10 @@ async def main(db, db_ns):
         for doc in doc_snapshot:
             print(f"Received offer: {doc.id}")
             if doc.exists:
-                global offersdp, dbpassword
+                global offersdp, dbpassword, videoSize, videoCodec
                 offersdp = doc_ref.get().get("sdp")
+                videoCodec = doc_ref.get().get("codec")
+                videoSize = doc_ref.get().get("resolution")
                 print(offersdp)
                 dbpassword = doc_ref.get().get("password")
                 print("Got", doc.get("type"), "!")
@@ -244,6 +256,7 @@ async def main(db, db_ns):
         print("pc.iceConnectionState: ", peerconnection.iceConnectionState, i)
         if webcam:
             print("Webcam state :", webcam.video.readyState)
+            print("\nResolution: ", videoSize,", codec: ", videoCodec,"\n")
         if (
             webcam
             and datachannel
