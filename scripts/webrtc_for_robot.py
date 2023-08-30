@@ -130,6 +130,7 @@ async def consumeOffer(peerconnection, offersdp, passwordattempt, db, doc_watch)
 
     answer = await peerconnection.createAnswer()
     await peerconnection.setLocalDescription(answer)
+    print("answer:\n", answer.sdp)
 
     await db.collection(robotName).document("answer").set(
         {
@@ -254,11 +255,6 @@ async def main(db, db_ns):
             break
         if i % 2 == 0 and peerconnection.connectionState == "connected":
             stats = await videosender.getStats()
-
-            for sender in peerconnection.get_senders():
-                params = sender.get_parameters()
-                for codec in params.codecs:
-                    print(f"Sender Codec: {codec.name}")
 
             prevpacketsSent = packetsSent
             outbound_key = next(key for key in stats if "outbound" in key)
