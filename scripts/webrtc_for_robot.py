@@ -244,10 +244,9 @@ async def main(db, db_ns):
 
     while not rospy.is_shutdown():
         i = i + 1
-        print(callback_done.is_set())
-        if callback_done.is_set() == True and k == 0:
+        if callback_done.is_set() == True and peerconnection.connectionState=="new":
             await consumeOffer(peerconnection, offersdp, dbpassword, db, doc_watch)
-            k = 1
+            callback_done.clear()
         global videosender, webcam
         if peerconnection.connectionState != previousConnectionState:
             i = 0
@@ -295,7 +294,6 @@ async def main(db, db_ns):
             and i == 7
             or f == 1
         ):
-            webcam.video.stop()
             await peerconnection.close()
             break
         j = 0
