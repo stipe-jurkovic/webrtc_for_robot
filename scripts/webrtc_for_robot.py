@@ -33,7 +33,7 @@ from aiortc import (
     RTCDataChannel,
     RTCIceCandidate,
 )
-from aiortc.contrib.media import MediaPlayer, MediaRelay
+from aiortc.contrib.media import MediaPlayer
 import firebase_admin
 from firebase_admin import firestore_async, firestore, credentials
 import threading
@@ -43,13 +43,12 @@ robotName = None
 chosenPassword = None
 dbpassword = None
 offersdp = None
-relay = None
 webcam = None
 videosender = None
-video = None
 pub = None
 rate = None
 move_cmd = None
+
 
 ice_servers = [
     RTCIceServer(urls=["stun:stun.l.google.com:19302"]),
@@ -101,13 +100,11 @@ def dbinit():
 
 
 def openWebcam():
-    global videosender, video, webcam, relay
+    global videosender, webcam
     try:
         if not webcam or webcam.video.readyState != "live":
             webcam = MediaPlayer("/dev/video0", options={"video_size": "320x240"})
-        relay = MediaRelay()
-        print(relay.__format__)
-        video = relay.subscribe(webcam.video)
+        print(webcam.__format__)
     except:
         print("Webcam unavailable!")
 
@@ -117,11 +114,11 @@ async def consumeOffer(peerconnection, offersdp, passwordattempt, db, doc_watch)
     if passwordattempt != chosenPassword:
         return
     offer = RTCSessionDescription(sdp=offersdp, type="offer")
-    global videosender, video, webcam
+    global videosender, webcam
     while not webcam or webcam.video.readyState != "live":
         time.sleep(1)
         openWebcam()
-    videosender = peerconnection.addTrack(video)
+    videosender = peerconnection.addTrack(webcam.video)
 
     print(await videosender.getStats())
     await peerconnection.setRemoteDescription(offer)
@@ -257,6 +254,11 @@ async def main(db, db_ns):
             break
         if i % 2 == 0 and peerconnection.connectionState == "connected":
             stats = await videosender.getStats()
+
+            for sender in peerconnection.get_senders():
+                params = sender.get_parameters()
+                for codec in params.codecs:
+                    print(f"Sender Codec: {codec.name}")
 
             prevpacketsSent = packetsSent
             outbound_key = next(key for key in stats if "outbound" in key)
